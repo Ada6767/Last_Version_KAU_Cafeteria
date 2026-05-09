@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAU Cafeteria</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="CSS/style.css">
+
+    <style>
+        /* ── Meal time badge ── */
+        .meal-time {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: rgba(255,255,255,0.92);
+            background: rgba(255,255,255,0.18);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            padding: 0.2rem 0.65rem;
+            margin-top: 0.35rem;
+        }
+
+        /* ── Order button on menu card ── */
+        .menu-card-footer {
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid rgba(0,0,0,0.07);
+            display: flex;
+            justify-content: flex-end;
+        }
+        .btn-order {
+            background: #1a1a2e;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.45rem 1.1rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.18s;
+        }
+        .btn-order:hover { background: #2d2d50; }
+
+        /* ── Modal overlay ── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+
+        /* ── Modal box ── */
+        .modal-box {
+            background: #fff;
+            border-radius: 16px;
+            padding: 2rem 2rem 1.5rem;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+            text-align: center;
+            animation: modalIn 0.22s ease;
+        }
+        @keyframes modalIn {
+            from { transform: translateY(14px); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+        .modal-icon {
+            font-size: 2rem;
+            margin-bottom: 0.6rem;
+        }
+        .modal-box h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            margin: 0 0 0.4rem;
+            color: #1a1a2e;
+        }
+        .modal-box p {
+            font-size: 0.88rem;
+            color: #666;
+            margin: 0 0 1.4rem;
+            line-height: 1.5;
+        }
+
+        /* ── Payment option cards ── */
+        .payment-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 1.1rem;
+        }
+        .payment-option {
+            border: 1.5px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 0.9rem 0.6rem;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .payment-option:hover {
+            border-color: #1a1a2e;
+            background: #f5f5fc;
+        }
+        .payment-option .opt-icon { font-size: 1.5rem; }
+        .payment-option .opt-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+        .payment-option .opt-sub {
+            font-size: 0.71rem;
+            color: #888;
+            line-height: 1.3;
+            text-align: center;
+        }
+
+        /* ── Cancel link ── */
+        .modal-cancel {
+            font-size: 0.8rem;
+            color: #aaa;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            text-decoration: underline;
+        }
+        .modal-cancel:hover { color: #666; }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+    <div class="container">
+        <header>
+            <div class="logo-area">
+                <div class="logo-icon">🍽️</div>
+                <div>
+                    <h1>KAU Cafeteria</h1>
+                    <span class="tagline">King Abdulaziz University</span>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- Today's Menu Section -->
+            <section class="menu-section">
+                <h2 class="section-title">Today's Menu</h2>
+                <p class="section-sub" id="today-date"></p>
+                <div id="menu-container" class="menu-grid">
+                    <div class="menu-loading">
+                        <div class="spinner"></div>
+                        <p>Loading today's menu...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Portal Selection -->
+            <section class="portal-selection">
+                <div class="portal-card customer">
+                    <div class="portal-icon">🎓</div>
+                    <h2>Student & Staff Portal</h2>
+                    <p>Buy meal tickets and manage your account</p>
+                    <div class="buttons">
+                        <a href="customer/login.html" class="btn">Login</a>
+                        <a href="customer/signup.html" class="btn secondary">Sign Up</a>
+                    </div>
+                </div>
+                <div class="portal-card worker">
+                    <div class="portal-icon">👷</div>
+                    <h2>Worker Portal</h2>
+                    <p>Scan and validate customer tickets</p>
+                    <div class="buttons">
+                        <a href="worker/login.html" class="btn teal">Login</a>
+                    </div>
+                </div>
+                <div class="portal-card admin">
+                    <div class="portal-icon">⚙️</div>
+                    <h2>Admin Panel</h2>
+                    <p>Update today's menu and manage the cafeteria</p>
+                    <div class="buttons">
+                        <a href="admin/index.html" class="btn gold">Manage Menu</a>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>© 2025 KAU Cafeteria · Restaurant Ticketing System</p>
+        </footer>
+    </div>
+
+    <!-- Payment Method Modal -->
+    <div class="modal-overlay" id="paymentModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-box">
+            <div class="modal-icon">🧾</div>
+            <h3 id="modalTitle">How would you like to pay?</h3>
+            <p>Choose your preferred payment method for this order.</p>
+            <div class="payment-options">
+                <div class="payment-option" onclick="handlePayment('balance')" role="button" tabindex="0">
+                    <span class="opt-icon">💳</span>
+                    <span class="opt-label">Account Balance</span>
+                    <span class="opt-sub">Deducted instantly from your wallet</span>
+                </div>
+                <div class="payment-option" onclick="handlePayment('onsite')" role="button" tabindex="0">
+                    <span class="opt-icon">🏪</span>
+                    <span class="opt-label">Pay at Cafeteria</span>
+                    <span class="opt-sub">Settle when you pick up your order</span>
+                </div>
+            </div>
+            <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { MenuAPI } from './JS/menu-api.js';
+
+        // Show today's date
+        const today = new Date();
+        document.getElementById('today-date').textContent =
+            today.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+        const dateKey = today.toISOString().split('T')[0];
+
+        const meals = [
+            { key:'breakfast', label:'Breakfast', icon:'🌅', time:'7:30 AM – 12:00 PM' },
+            { key:'lunch',     label:'Lunch',     icon:'☀️', time:'12:00 PM – 5:00 PM' },
+            { key:'dinner',    label:'Dinner',    icon:'🌙', time:'6:00 PM – 9:00 PM'  }
+        ];
+
+        async function loadMenu() {
+            const container = document.getElementById('menu-container');
+            try {
+                const data = await MenuAPI.getForDateWithFallback(dateKey);
+
+                if (data) {
+                    container.innerHTML = meals.map(m => {
+                        const items = data[m.key] || [];
+                        return `
+                            <div class="menu-card">
+                                <div class="menu-card-header">
+                                    <span class="meal-icon">${m.icon}</span>
+                                    <div>
+                                        <h3>${m.label}</h3>
+                                        <div class="meal-time">🕐 ${m.time}</div>
+                                    </div>
+                                </div>
+                                <ul class="menu-items">
+                                    ${items.length
+                                        ? items.map(i => `<li>${i}</li>`).join('')
+                                        : '<li class="no-items">Menu not set yet</li>'}
+                                </ul>
+                                <div class="menu-card-footer">
+                                    <button class="btn-order" onclick="openPaymentModal('${m.label}')">Order</button>
+                                </div>
+                            </div>`;
+                    }).join('');
+                } else {
+                    container.innerHTML = `<div class="menu-empty"><p>📋 Today's menu hasn't been posted yet. Check back soon!</p></div>`;
+                }
+            } catch {
+                container.innerHTML = `
+                    <div class="menu-empty">
+                        <p>⚠️ Could not load menu. Please check your JSONBin setup.</p>
+                        <p style="font-size:0.85rem;color:#999;margin-top:0.5rem">See SETUP_GUIDE.md for instructions</p>
+                    </div>`;
+            }
+        }
+
+        loadMenu();
+
+        // Expose modal functions to global scope
+        window._selectedMeal = null;
+
+        window.openPaymentModal = function(mealLabel) {
+            window._selectedMeal = mealLabel;
+            document.getElementById('paymentModal').classList.add('active');
+        };
+
+        window.closeModal = function() {
+            document.getElementById('paymentModal').classList.remove('active');
+            window._selectedMeal = null;
+        };
+
+        window.handlePayment = function(method) {
+            closeModal();
+            if (method === 'balance') {
+                // Redirect to login if not authenticated, otherwise to order flow
+                window.location.href = 'customer/login.html?method=balance&meal=' + encodeURIComponent(window._selectedMeal || '');
+            } else {
+                window.location.href = 'customer/login.html?method=onsite&meal=' + encodeURIComponent(window._selectedMeal || '');
+            }
+        };
+
+        // Close modal when clicking the backdrop
+        document.getElementById('paymentModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // Keyboard accessibility: Enter/Space on payment options
+        document.querySelectorAll('.payment-option').forEach(el => {
+            el.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') el.click();
+            });
+        });
+    </script>
+</body>
+</html>

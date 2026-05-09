@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard – KAU Cafeteria</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../CSS/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <style>
+        /* ── Meal time badge on purchase cards ── */
+        .meal-time-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--teal);
+            background: rgba(26,122,110,0.09);
+            border: 1px solid rgba(26,122,110,0.25);
+            border-radius: 20px;
+            padding: 0.22rem 0.75rem;
+            margin-bottom: 0.9rem;
+        }
+
+        /* ── Payment modal ── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: #fff;
+            border-radius: 16px;
+            padding: 2rem 2rem 1.5rem;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+            text-align: center;
+            animation: modalIn 0.22s ease;
+        }
+        @keyframes modalIn {
+            from { transform: translateY(14px); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+        .modal-icon { font-size: 2rem; margin-bottom: 0.6rem; }
+        .modal-box h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            margin: 0 0 0.4rem;
+            color: var(--dark);
+        }
+        .modal-box .modal-sub {
+            font-size: 0.88rem;
+            color: var(--muted);
+            margin: 0 0 1.4rem;
+            line-height: 1.5;
+        }
+        .payment-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 1.1rem;
+        }
+        .payment-option {
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: 0.9rem 0.6rem;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .payment-option:hover {
+            border-color: var(--primary);
+            background: rgba(192,57,43,0.04);
+        }
+        .payment-option .opt-icon { font-size: 1.5rem; }
+        .payment-option .opt-label { font-size: 0.82rem; font-weight: 700; color: var(--dark); }
+        .payment-option .opt-sub { font-size: 0.72rem; color: var(--muted); line-height: 1.3; text-align: center; }
+        .modal-cancel {
+            font-size: 0.8rem;
+            color: var(--muted);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            text-decoration: underline;
+        }
+        .modal-cancel:hover { color: var(--dark); }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+    <div class="container">
+        <header>
+            <div class="logo-area">
+                <div class="logo-icon">🍽️</div>
+                <div>
+                    <h1>KAU Cafeteria</h1>
+                    <span class="tagline">My Dashboard</span>
+                </div>
+            </div>
+            <div class="user-actions">
+                <span id="user-name"></span>
+                <button id="logout-btn" class="btn secondary">Logout</button>
+            </div>
+        </header>
+
+        <main>
+            <div id="alert-container"></div>
+
+            <!-- Loading overlay -->
+            <div id="page-loading" style="text-align:center;padding:3rem">
+                <div class="spinner"></div>
+                <p style="color:var(--muted);margin-top:1rem">Loading your account…</p>
+            </div>
+
+            <div id="page-content" style="display:none">
+
+                <!-- Account Info -->
+                <div class="dashboard-section">
+                    <h2>👤 Account Information</h2>
+                    <p id="user-email" style="color:var(--muted);margin-bottom:0.3rem"></p>
+                    <p id="user-status" style="color:var(--teal);font-weight:600;margin-bottom:1rem"></p>
+                    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+                        <div class="balance-badge">
+                            💰 Balance: <span class="amount" id="user-balance">0.00</span> SAR
+                        </div>
+                        <button id="add-balance-btn" class="btn">Add Balance</button>
+                    </div>
+                </div>
+
+                <!-- Today's Menu -->
+                <div class="dashboard-section">
+                    <h2>📋 Today's Menu</h2>
+                    <p class="section-sub" id="dashboard-date"></p>
+                    <div id="dashboard-menu" class="menu-grid">
+                        <div class="menu-loading"><div class="spinner"></div><p>Loading menu…</p></div>
+                    </div>
+                </div>
+
+                <!-- Purchase Tickets -->
+                <div class="dashboard-section">
+                    <h2>🎟️ Purchase Tickets</h2>
+                    <div class="meal-options">
+                        <div class="meal-card">
+                            <h3>🌅 Breakfast</h3>
+                            <p class="meal-time-badge">🕐 7:30 AM – 12:00 PM</p>
+                            <p class="original-price">13.50 SAR</p>
+                            <p class="your-price" id="breakfast-price">13.50 SAR</p>
+                            <button class="btn buy-btn" data-meal="breakfast" data-price="13.50">Buy Ticket</button>
+                        </div>
+                        <div class="meal-card">
+                            <h3>☀️ Lunch</h3>
+                            <p class="meal-time-badge">🕐 12:00 PM – 5:00 PM</p>
+                            <p class="original-price">23.00 SAR</p>
+                            <p class="your-price" id="lunch-price">23.00 SAR</p>
+                            <button class="btn buy-btn" data-meal="lunch" data-price="23.00">Buy Ticket</button>
+                        </div>
+                        <div class="meal-card">
+                            <h3>🌙 Dinner</h3>
+                            <p class="meal-time-badge">🕐 6:00 PM – 9:00 PM</p>
+                            <p class="original-price">23.00 SAR</p>
+                            <p class="your-price" id="dinner-price">23.00 SAR</p>
+                            <button class="btn buy-btn" data-meal="dinner" data-price="23.00">Buy Ticket</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Tickets -->
+                <div class="dashboard-section">
+                    <h2>🎫 My Tickets</h2>
+                    <div id="tickets-container" class="tickets-grid"></div>
+                </div>
+
+            </div><!-- end page-content -->
+
+            <!-- Add Balance Modal -->
+            <div id="balance-modal" class="modal">
+                <div class="modal-content">
+                    <span class="close">&times;</span>
+                    <h2>Add Balance</h2>
+                    <form id="add-balance-form">
+                        <div class="form-group">
+                            <label for="amount">Amount (SAR)</label>
+                            <input type="number" id="amount" min="10" step="10" value="100">
+                        </div>
+                        <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1.5rem">
+                            🧪 Prototype mode — simulates adding balance.
+                        </p>
+                        <button type="submit" class="btn" id="add-balance-submit">Add Balance</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- QR Modal -->
+            <div id="qr-modal" class="modal">
+                <div class="modal-content">
+                    <span class="close">&times;</span>
+                    <h2>Your Ticket</h2>
+                    <div id="qr-container" class="qr-display"></div>
+                    <div class="ticket-info">
+                        <p>Meal: <strong><span id="ticket-meal-type"></span></strong></p>
+                        <p>Purchased: <span id="ticket-date"></span></p>
+                        <p style="font-size:0.82rem;color:var(--muted);margin-top:0.5rem">
+                            Ticket ID: <span id="ticket-full-id" style="font-family:monospace;word-break:break-all"></span>
+                        </p>
+                    </div>
+                    <p class="instructions">Show this QR code to the cafeteria worker.<br>
+                    <small>If QR fails, give them the Ticket ID above.</small></p>
+                </div>
+            </div>
+        </main>
+        <footer><p>© 2025 KAU Cafeteria</p></footer>
+    </div>
+
+    <!-- Payment Method Modal -->
+    <div class="modal-overlay" id="payment-method-modal" role="dialog" aria-modal="true" aria-labelledby="paymentModalTitle">
+        <div class="modal-box">
+            <div class="modal-icon">🧾</div>
+            <h3 id="paymentModalTitle">How would you like to pay?</h3>
+            <p class="modal-sub">Choose your preferred payment method for this ticket.</p>
+            <div class="payment-options">
+                <div class="payment-option" id="pay-balance-btn" role="button" tabindex="0">
+                    <span class="opt-icon">💳</span>
+                    <span class="opt-label">Account Balance</span>
+                    <span class="opt-sub">Deducted instantly from your wallet</span>
+                </div>
+                <div class="payment-option" id="pay-onsite-btn" role="button" tabindex="0">
+                    <span class="opt-icon">🏪</span>
+                    <span class="opt-label">Pay at Cafeteria</span>
+                    <span class="opt-sub">Settle the amount when you collect your meal</span>
+                </div>
+            </div>
+            <button class="modal-cancel" id="payment-cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <script src="../JS/database.js"></script>
+    <script src="../JS/auth.js"></script>
+
+    <!-- Menu loading via ES module -->
+    <script type="module">
+        import { MenuAPI } from '../JS/menu-api.js';
+        const today   = new Date();
+        const dateKey = today.toISOString().split('T')[0];
+        document.getElementById('dashboard-date').textContent =
+            today.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+        async function loadMenu() {
+            const container = document.getElementById('dashboard-menu');
+            const data = await MenuAPI.getForDateWithFallback(dateKey);
+            if (data) {
+                const meals = [
+                    {key:'breakfast',label:'Breakfast',icon:'🌅',time:'7:30 AM – 12:00 PM'},
+                    {key:'lunch',    label:'Lunch',    icon:'☀️',time:'12:00 PM – 5:00 PM'},
+                    {key:'dinner',   label:'Dinner',   icon:'🌙',time:'6:00 PM – 9:00 PM'}
+                ];
+                container.innerHTML = meals.map(m => {
+                    const items = data[m.key] || [];
+                    return `<div class="menu-card">
+                        <div class="menu-card-header"><span class="meal-icon">${m.icon}</span><div><h3>${m.label}</h3><span style="font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:0.18rem 0.6rem;display:inline-block;margin-top:0.3rem">🕐 ${m.time}</span></div></div>
+                        <ul class="menu-items">
+                            ${items.length ? items.map(i=>`<li>${i}</li>`).join('') : '<li class="no-items">Not posted yet</li>'}
+                        </ul>
+                    </div>`;
+                }).join('');
+            } else {
+                container.innerHTML = '<div class="menu-empty"><p>📋 Today\'s menu hasn\'t been posted yet.</p></div>';
+            }
+        }
+        loadMenu();
+    </script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', async function() {
+
+        // Auth check
+        const session = Auth.customer.getCurrentUser();
+        if (!session) { window.location.href = 'login.html'; return; }
+
+        // Show loading, hide content
+        document.getElementById('page-loading').style.display = 'block';
+        document.getElementById('page-content').style.display  = 'none';
+
+        // Fetch fresh user data from cloud
+        let currentUser = await Auth.customer.refreshCurrentUser();
+        if (!currentUser) { window.location.href = 'login.html'; return; }
+
+        // Show content
+        document.getElementById('page-loading').style.display = 'none';
+        document.getElementById('page-content').style.display  = 'block';
+
+        // Fill user info
+        document.getElementById('user-name').textContent    = currentUser.name;
+        document.getElementById('user-email').textContent   = currentUser.email;
+        document.getElementById('user-status').textContent  = currentUser.isStudent
+            ? '🎓 KAU Student — 50% Discount Applied!' : '👤 Regular Customer';
+        document.getElementById('user-balance').textContent = (currentUser.balance||0).toFixed(2);
+
+        // Apply student discount
+        const buyBtns = document.querySelectorAll('.buy-btn');
+        if (currentUser.isStudent) {
+            document.getElementById('breakfast-price').textContent = (13.50/2).toFixed(2)+' SAR';
+            document.getElementById('lunch-price').textContent     = (23.00/2).toFixed(2)+' SAR';
+            document.getElementById('dinner-price').textContent    = (23.00/2).toFixed(2)+' SAR';
+            buyBtns.forEach(btn => btn.setAttribute('data-price', (parseFloat(btn.getAttribute('data-price'))/2).toFixed(2)));
+        }
+
+        await loadTickets();
+
+        // ── Logout ──
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            Auth.customer.logout();
+            window.location.href = 'login.html';
+        });
+
+        // ── Modals ──
+        const balanceModal = document.getElementById('balance-modal');
+        const qrModal      = document.getElementById('qr-modal');
+
+        document.getElementById('add-balance-btn').addEventListener('click', () => balanceModal.style.display='block');
+        document.querySelectorAll('.close').forEach(btn => {
+            btn.addEventListener('click', () => { balanceModal.style.display='none'; qrModal.style.display='none'; });
+        });
+        window.addEventListener('click', e => {
+            if (e.target===balanceModal) balanceModal.style.display='none';
+            if (e.target===qrModal)      qrModal.style.display='none';
+        });
+
+        // ── Add Balance ──
+        document.getElementById('add-balance-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('add-balance-submit');
+            submitBtn.textContent = 'Adding…';
+            submitBtn.disabled = true;
+
+            const amount  = parseFloat(document.getElementById('amount').value);
+            if (isNaN(amount)||amount<=0) { showAlert('Enter a valid amount','danger'); return; }
+
+            const updated = await DB.users.update(currentUser.id, { balance: (currentUser.balance||0)+amount });
+            if (updated) {
+                currentUser = { ...updated, password: undefined };
+                sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+                document.getElementById('user-balance').textContent = currentUser.balance.toFixed(2);
+                showAlert(`${amount.toFixed(2)} SAR added!`, 'success');
+                balanceModal.style.display = 'none';
+            }
+            submitBtn.textContent = 'Add Balance';
+            submitBtn.disabled = false;
+        });
+
+        // ── Buy Ticket ──
+        let pendingPurchase = null; // { btn, mealType, price }
+
+        buyBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const mealType = this.getAttribute('data-meal');
+                const price    = parseFloat(this.getAttribute('data-price'));
+                pendingPurchase = { btn: this, mealType, price };
+                document.getElementById('payment-method-modal').classList.add('active');
+            });
+        });
+
+        // Payment modal — pay from balance
+        document.getElementById('pay-balance-btn').addEventListener('click', async function() {
+            if (!pendingPurchase) return;
+            document.getElementById('payment-method-modal').classList.remove('active');
+            const { btn, mealType, price } = pendingPurchase;
+            pendingPurchase = null;
+
+            if ((currentUser.balance||0) < price) {
+                showAlert('Insufficient balance. Please add funds first.', 'danger');
+                return;
+            }
+
+            btn.textContent = 'Buying…';
+            btn.disabled = true;
+
+            await DB.tickets.create({ userId: currentUser.id, mealType, price });
+            const updated = await DB.users.update(currentUser.id, { balance: (currentUser.balance||0)-price });
+
+            if (updated) {
+                currentUser = { ...updated, password: undefined };
+                sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+                document.getElementById('user-balance').textContent = currentUser.balance.toFixed(2);
+                showAlert(`${mealType.charAt(0).toUpperCase()+mealType.slice(1)} ticket purchased!`, 'success');
+                await loadTickets();
+            }
+
+            btn.textContent = 'Buy Ticket';
+            btn.disabled = false;
+        });
+
+        // Payment modal — pay at cafeteria
+        document.getElementById('pay-onsite-btn').addEventListener('click', async function() {
+            if (!pendingPurchase) return;
+            document.getElementById('payment-method-modal').classList.remove('active');
+            const { btn, mealType, price } = pendingPurchase;
+            pendingPurchase = null;
+
+            btn.textContent = 'Reserving…';
+            btn.disabled = true;
+
+            await DB.tickets.create({ userId: currentUser.id, mealType, price, paymentMethod: 'onsite' });
+            showAlert(`${mealType.charAt(0).toUpperCase()+mealType.slice(1)} ticket reserved — please pay at the cafeteria counter.`, 'success');
+            await loadTickets();
+
+            btn.textContent = 'Buy Ticket';
+            btn.disabled = false;
+        });
+
+        // Payment modal — cancel
+        document.getElementById('payment-cancel-btn').addEventListener('click', function() {
+            document.getElementById('payment-method-modal').classList.remove('active');
+            pendingPurchase = null;
+        });
+        document.getElementById('payment-method-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('active');
+                pendingPurchase = null;
+            }
+        });
+        document.querySelectorAll('.payment-option').forEach(el => {
+            el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') el.click(); });
+        });
+
+        // ── Load Tickets ──
+        async function loadTickets() {
+            const container = document.getElementById('tickets-container');
+            container.innerHTML = '<div class="menu-loading"><div class="spinner"></div></div>';
+            const tickets = await DB.tickets.getUserTickets(currentUser.id);
+            const unused  = tickets.filter(t => !t.used);
+            container.innerHTML = '';
+
+            if (unused.length === 0) {
+                container.innerHTML = '<p class="no-tickets">No tickets yet. Buy one above! 👆</p>';
+                return;
+            }
+
+            unused.forEach(ticket => {
+                const el      = document.createElement('div');
+                el.className  = 'ticket-card';
+                const meal    = ticket.mealType.charAt(0).toUpperCase()+ticket.mealType.slice(1);
+                const date    = new Date(ticket.createdAt).toLocaleDateString();
+                const shortId = ticket.id.substring(0,24)+'…';
+                const payBadge = ticket.paymentMethod === 'onsite'
+                    ? `<span style="font-size:0.72rem;font-weight:700;color:var(--warning);background:rgba(245,127,23,0.1);border:1px solid rgba(245,127,23,0.3);border-radius:20px;padding:0.18rem 0.6rem;display:inline-block;margin-bottom:0.7rem">🏪 Pay at Cafeteria</span>`
+                    : `<span style="font-size:0.72rem;font-weight:700;color:var(--success);background:rgba(46,125,50,0.08);border:1px solid rgba(46,125,50,0.25);border-radius:20px;padding:0.18rem 0.6rem;display:inline-block;margin-bottom:0.7rem">💳 Paid via Balance</span>`;
+                el.innerHTML  = `
+                    <div class="ticket-header">
+                        <h3>${meal}</h3>
+                        <span class="ticket-price">${ticket.price.toFixed(2)} SAR</span>
+                    </div>
+                    <div class="ticket-body">
+                        ${payBadge}
+                        <p>Purchased: ${date}</p>
+                        <p style="font-family:monospace;font-size:0.78rem;color:var(--muted);margin-bottom:0.9rem;word-break:break-all" title="${ticket.id}">
+                            🔑 ${shortId}
+                        </p>
+                        <button class="btn view-qr-btn"
+                            data-ticket-id="${ticket.id}"
+                            data-meal-type="${meal}"
+                            data-date="${date}">
+                            View QR Code
+                        </button>
+                    </div>`;
+                container.appendChild(el);
+            });
+
+            // QR buttons
+            document.querySelectorAll('.view-qr-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const ticketId = this.getAttribute('data-ticket-id');
+                    document.getElementById('ticket-meal-type').textContent = this.getAttribute('data-meal-type');
+                    document.getElementById('ticket-date').textContent      = this.getAttribute('data-date');
+                    document.getElementById('ticket-full-id').textContent   = ticketId;
+
+                    const qrContainer = document.getElementById('qr-container');
+                    qrContainer.innerHTML = '';
+                    const qr = qrcode(0,'L');
+                    qr.addData(ticketId);
+                    qr.make();
+                    qrContainer.innerHTML = qr.createImgTag(10);
+                    qrModal.style.display = 'block';
+                });
+            });
+        }
+
+        function showAlert(msg, type) {
+            const el = document.createElement('div');
+            el.className = `alert alert-${type}`;
+            el.textContent = msg;
+            const c = document.getElementById('alert-container');
+            c.innerHTML = '';
+            c.appendChild(el);
+            setTimeout(() => el.remove(), 5000);
+        }
+    });
+    </script>
+</body>
+</html>
